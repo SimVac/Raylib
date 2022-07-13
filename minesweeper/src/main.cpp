@@ -45,10 +45,12 @@ public:
         bomb = val;
     }
 
-    void show(int dim, int screenWidth, int screenHeight) const {
-        DrawRectangle(pos.x, pos.y, screenWidth / dim, screenHeight / dim, WHITE);
-        if (!active)
-            DrawRectangle(pos.x + 1, pos.y + 1, screenWidth / dim - 2, screenHeight / dim - 2, BLACK);
+    bool isActive() const{
+        return active;
+    }
+
+    Vector2D getPos() const{
+        return pos;
     }
 
     void click(){
@@ -56,15 +58,43 @@ public:
     }
 };
 
-void detect_click (std::vector<Tile> &tiles, int screenWidth, int screenHeight, int dim){
-    if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
-        return;
-    Vector2D mouse;
-    mouse.x = GetMouseX();
-    mouse.y = GetMouseY();
-    int j = mouse.x / (screenWidth / dim), i = mouse.y / (screenHeight / dim);
-    tiles.at(j + i * dim).click();
-}
+class Grid{
+    std::vector<Tile> tiles;
+    int dim, screenWidth, screenHeight;
+public:
+    Grid(int dim, int screenWidth, int screenHeight){
+        for (int i = 0; i < dim * dim; ++i) {
+            Tile temp = Tile((i % dim) * screenWidth / dim, (i / dim) * screenHeight / dim);
+            tiles.push_back(temp);
+        }
+        this->dim = dim;
+        this->screenWidth = screenWidth;
+        this->screenHeight = screenHeight;
+    }
+
+    void show () const{
+        int d = screenWidth / dim;
+        for (int i = 0; i < dim; ++i) {
+            DrawLine(i * d, 0, i * d, screenHeight, GRAY);
+            DrawLine(0, i * d, screenWidth, i * d, GRAY);
+        }
+        for (auto tile : tiles) {
+            if (tile.isActive())
+                DrawRectangle(tile.getPos().x, tile.getPos().y, d - 1, d - 1, WHITE);
+        }
+    }
+
+    void detect_click (){
+        if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+            return;
+        Vector2D mouse;
+        mouse.x = GetMouseX();
+        mouse.y = GetMouseY();
+        int j = mouse.x / (screenWidth / dim), i = mouse.y / (screenHeight / dim);
+        tiles.at(j + i * dim).click();
+    }
+};
+
 
 int main()
 {
@@ -80,22 +110,16 @@ int main()
 
     // Main game loop
     int dim = 10;
-    std::vector<Tile> tiles;
-    for (int i = 0; i < dim * dim; ++i) {
-        Tile temp = Tile((i % dim) * screenWidth / dim, (i / dim) * screenHeight / dim);
-        tiles.push_back(temp);
-    }
+    Grid grid = Grid(dim, screenWidth, screenHeight);
 
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
-        detect_click(tiles, screenWidth, screenHeight, dim);
+        grid.detect_click();
+
         BeginDrawing();
 
         ClearBackground(BLACK);
-
-        for (const auto &t: tiles) {
-            t.show(dim, screenWidth, screenHeight);
-        }
+        grid.show();
 
         EndDrawing();
         //----------------------------------------------------------------------------------
