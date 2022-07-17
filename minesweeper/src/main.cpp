@@ -33,6 +33,7 @@ class Tile{
     bool bomb;
     bool active;
     int near_bombs;
+    bool flag;
 
     bool valid(int i, int j, int dim){
         if (i < 0 || i >= dim || j < 0 || j >= dim)
@@ -45,13 +46,15 @@ class Tile{
         int pos_in_vec_i = pos_in_vector / dim , pos_in_vec_j = pos_in_vector % dim;
         for (int i = -1; i < 2; ++i) {
             for (int j = -1; j < 2; ++j) {
+                if (i == 0 && j == 0)
+                    continue;
                 if (valid(pos_in_vec_j + j, pos_in_vec_i + i, dim)){
                     if (tiles.at(pos_in_vec_j + j + (pos_in_vec_i + i) * dim).isBomb())
                         count++;
                 }
             }
         }
-        return count - 1;
+        return count;
     }
 public:
 
@@ -59,7 +62,8 @@ public:
         pos.x = x;
         pos.y = y;
         active = false;
-        bomb = true;
+        bomb = false;
+        flag = false;
     }
 
     void setBomb (bool val){
@@ -68,6 +72,14 @@ public:
 
     bool isBomb () const{
         return bomb;
+    }
+
+    void setFlag (bool val){
+        flag = val;
+    }
+
+    bool getFlag () {
+        return flag;
     }
 
     bool isActive() const{
@@ -82,7 +94,7 @@ public:
         active = true;
     }
 
-    int getNearbombs (){
+    int getNearbombs () const{
         return near_bombs;
     }
 
@@ -94,12 +106,33 @@ public:
 class Grid{
     std::vector<Tile> tiles;
     int dim, screenWidth, screenHeight;
+
+    bool valid (int x, int y) const{
+        if (x < 0 || x >= dim || y < 0 || y >= dim)
+            return false;
+        return true;
+    }
+
+    void generate_bombs (int n){
+        std::vector<int> numbers;
+        for (int i = 0; i < tiles.size(); ++i) {
+            numbers.push_back(i);
+        }
+        unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+        std::shuffle(numbers.begin(), numbers.end(), std::default_random_engine(seed));
+        for (int i = 0; i < n; ++i) {
+            tiles.at(numbers.at(i)).setBomb(true);
+        }
+    }
+
 public:
+
     Grid(int dim, int screenWidth, int screenHeight){
         for (int i = 0; i < dim * dim; ++i) {
             Tile temp = Tile((i % dim) * screenWidth / dim, (i / dim) * screenHeight / dim);
             tiles.push_back(temp);
         }
+        generate_bombs(10);
         for (int i = 0; i < dim * dim; ++i) {
             tiles.at(i).setNearbombs(tiles, dim, i);
         }
@@ -117,7 +150,26 @@ public:
         for (auto tile : tiles) {
             if (tile.isActive()) {
                 DrawRectangle(tile.getPos().x, tile.getPos().y, d - 1, d - 1, WHITE);
-                DrawText(std::to_string(tile.getNearbombs()).c_str(), tile.getPos().x + 27, tile.getPos().y + d - 60, 50, BLACK);
+                if (tile.isBomb())
+                    DrawText("B", tile.getPos().x + 27, tile.getPos().y + d - 60, 50, BLACK);
+                else
+                    DrawText(std::to_string(tile.getNearbombs()).c_str(), tile.getPos().x + 27, tile.getPos().y + d - 60, 50, BLACK);
+            }else if (tile.getFlag()){
+                DrawText("F", tile.getPos().x + 27, tile.getPos().y + d - 60, 50, WHITE);
+            }
+        }
+    }
+
+    void expand_click (int x, int y){
+        for (int i = -1; i < 2; ++i) {
+            for (int j = -1; j < 2; ++j) {
+                if (valid(x + j, y + i)){
+                    if (!tiles.at((x + j) + (y + i) * dim).isActive()){
+                        tiles.at((x + j) + (y + i) * dim).click();
+                        if (tiles.at((x + j) + (y + i) * dim).getNearbombs() == 0)
+                            expand_click(x + j, y + i);
+                    }
+                }
             }
         }
     }
@@ -129,7 +181,25 @@ public:
         mouse.x = GetMouseX();
         mouse.y = GetMouseY();
         int j = mouse.x / (screenWidth / dim), i = mouse.y / (screenHeight / dim);
-        tiles.at(j + i * dim).click();
+        int pos = j + i * dim;
+        if (tiles.at(pos).getFlag())
+            return;
+        tiles.at(pos).click();
+        if (tiles.at(pos).getNearbombs() == 0 && !tiles.at(pos).isBomb())
+            expand_click(j, i);
+    }
+
+    void detect_flag (){
+        if (!IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
+            return;
+        Vector2D mouse;
+        mouse.x = GetMouseX();
+        mouse.y = GetMouseY();
+        int j = mouse.x / (screenWidth / dim), i = mouse.y / (screenHeight / dim);
+        int pos = j + i * dim;
+        if (tiles.at(pos).isActive())
+            return;
+        tiles.at(pos).setFlag(!tiles.at(pos).getFlag());
     }
 };
 
@@ -153,6 +223,7 @@ int main()
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
         grid.detect_click();
+        grid.detect_flag();
 
         BeginDrawing();
 
