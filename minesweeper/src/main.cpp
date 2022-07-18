@@ -78,7 +78,7 @@ public:
         flag = val;
     }
 
-    bool getFlag () {
+    bool getFlag () const{
         return flag;
     }
 
@@ -106,6 +106,7 @@ public:
 class Grid{
     std::vector<Tile> tiles;
     int dim, screenWidth, screenHeight;
+    bool lose, win;
 
     bool valid (int x, int y) const{
         if (x < 0 || x >= dim || y < 0 || y >= dim)
@@ -139,6 +140,8 @@ public:
         this->dim = dim;
         this->screenWidth = screenWidth;
         this->screenHeight = screenHeight;
+        lose = false;
+        win = false;
     }
 
     void show () const{
@@ -201,6 +204,41 @@ public:
             return;
         tiles.at(pos).setFlag(!tiles.at(pos).getFlag());
     }
+
+    void clear_all (){
+        for (auto &tile: tiles) {
+             tile.click();
+        }
+    }
+
+    void check_lose (){
+        if (win)
+            return;
+        for (const auto &tile: tiles) {
+            if (tile.isBomb() && tile.isActive()){
+                clear_all();
+                lose = true;
+                return;
+            }
+        }
+    }
+
+    void check_win (){
+        for (const auto &tile: tiles) {
+            if (tile.isBomb() && !tile.getFlag())
+                return;
+        }
+        clear_all();
+        win = true;
+    }
+
+    bool getLose (){
+        return lose;
+    }
+
+    bool getWin (){
+        return win;
+    }
 };
 
 
@@ -222,15 +260,43 @@ int main()
 
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
-        grid.detect_click();
-        grid.detect_flag();
+        grid.check_lose();
+        grid.check_win();
+        if (!grid.getLose() && !grid.getWin()) {
+            grid.detect_click();
+            grid.detect_flag();
 
-        BeginDrawing();
+            BeginDrawing();
 
-        ClearBackground(BLACK);
-        grid.show();
+            ClearBackground(BLACK);
+            grid.show();
 
-        EndDrawing();
+            EndDrawing();
+        }else if (grid.getLose()){
+            BeginDrawing();
+
+            ClearBackground(BLACK);
+            grid.show();
+
+            DrawText("YOU LOST", screenWidth / 2 -  130, screenHeight / 2 - 60, 50, RED);
+
+            EndDrawing();
+        }else if (grid.getWin()){
+            BeginDrawing();
+
+            ClearBackground(BLACK);
+            grid.show();
+
+            DrawText("YOU WIN", screenWidth / 2 -  130, screenHeight / 2 - 60, 50, RED);
+
+            EndDrawing();
+        }else{
+            BeginDrawing();
+
+            DrawText("C'E' UN QUALCHE BUG CHE NON HO VOGLIA DI TROVARE", screenWidth / 2 -  130, screenHeight / 2 - 60, 50, RED);
+
+            EndDrawing();
+        }
         //----------------------------------------------------------------------------------
     }
 
